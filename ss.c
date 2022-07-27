@@ -198,102 +198,115 @@ void * thread(void * arg) {
 
 // slong (signed long) max is 9223372036854775807 or 2**63 - 1
 /**
- * cmd line args: $./ss EXP BASE_TWO NUM_THREADS
- * e.g. $./ss 8 0 8 (10**8 max, 8 threads)
- * e.g. $./ss 32 1 8 (2**32 max, 8 threads)
+ * cmd line args: $./ss EXP NUM_THREADS or $./ss MIN MAX NUM_THREADS
+ * e.g. $./ss 8 8 (10**8 max, 8 threads)
+ * e.g. $./ss 2 1000 8 (2 min, 1000 max, 8 threads)
  */
 int main(int argc, char* argv[]) 
 {
-    FILE* fp = fopen("output.txt", "w");
-
     // the default is 10**3
     int EXP = 3; 
-    int BASE_TWO = 0; 
+    slong MIN = 2;
+    slong MAX = 1000;
     int NUM_THREADS = 1;
 
-    // get the BASE and EXP from the cmd line args
-    if (argc > 1) {
-        EXP = atoi(argv[1]);
-    }
-    printf("EXP %d\n", EXP);
-    if (argc > 2) {
-        BASE_TWO = atoi(argv[2]);
-    }
+    if (argc == 2 || argc > 4) {
+        printf("[ERROR] incorrect number of command line arguments.\n");
 
-    // error check for max
-    if (BASE_TWO == 1 && EXP > 62) {
-        printf("[ERROR] MAX cannot exceed 2**62\n");
+        return 1;
     }
-    else if (BASE_TWO == 0 && EXP > 18) {
-        printf("[ERROR] MAX cannot exceed 10**18\n");
-    }
-    else {
-        // if BASE_TWO is set, do 2**EXP, else do 10**EXP
-        slong MAX;
-        MAX = (BASE_TWO == 1) ? quick_pow2(EXP) : quick_pow10(EXP);
+    // get the EXP from the cmd line args
+    if (argc == 3) {
+        EXP = atoi(argv[1]);
+        MAX = quick_pow10(EXP);
+        printf("EXP %d\n", EXP);
         flint_printf("MAX %wd\n", MAX);
 
-        // if NUM_THREADS is set
-        if (argc > 3) {
-            NUM_THREADS = atoi(argv[3]);
-            flint_set_num_threads(NUM_THREADS);
-            printf("num_threads %d\n", flint_get_num_threads());
-        }
-
-        pthread_t threads[NUM_THREADS];
-        myarg_t myargs[NUM_THREADS];
-
-        struct timespec start, end;
-        double cpu_time = 0.0;
-        int e, t; // the indices
-        slong n, count, max, step;
-        n = 1; // the MIN (2)
-        count = 0; // the total
-
-        flint_fprintf(fp, "MIN 2, MAX %wd\n", MAX);
-        fprintf(fp, "N\t\t\t\tcount\t\t\t\ttime (s)\n");
-        // for each exponent
-        for (e = 1; e <= EXP; e++) {
-            max = (BASE_TWO == 1) ? quick_pow2(e) : quick_pow10(e);
-            step = (max - n) / NUM_THREADS;
-
-            clock_gettime(CLOCK_MONOTONIC, &start);
-
-            // for each thread
-            for (t = 0; t < NUM_THREADS; t++) {
-                myargs[t].count = 0;
-                myargs[t].MIN = n + 1;
-                myargs[t].MAX = (t == NUM_THREADS - 1) ?
-                    max : n + step;
-
-                pthread_create(&threads[t], NULL, thread, &myargs[t]);
-
-                n += step;
-            }
-            
-            for (t = 0; t < NUM_THREADS; t++) {	
-                pthread_join(threads[t], NULL); // wait for the specified thread to terminate
-                count += myargs[t].count; // sum
-            }
-
-            clock_gettime(CLOCK_MONOTONIC, &end);
-            cpu_time += end.tv_sec - start.tv_sec;
-            cpu_time += (end.tv_nsec - start.tv_nsec) / 1000000000.0;
-
-            // flint_fprintf(fp, "%wd\t\t\t\t%wd\t\t\t\t%f\n", quick_pow10(e), count, cpu_time);
-            if (BASE_TWO == 1) {
-                flint_fprintf(fp, "2**%d\t\t\t\t%wd\t\t\t\t%f\n", e, count, cpu_time);
-            }
-            else {
-                flint_fprintf(fp, "10**%d\t\t\t\t%wd\t\t\t\t%f\n", e, count, cpu_time);
-            }
-            fflush(fp);
-
-            n = max;
-        }
-
-        flint_printf("count %wd\n", count);
+        NUM_THREADS = atoi(argv[2]);
     }
+    // get the MIN, MAX
+    if (argc == 4) {
+        MIN = atol(argv[1]);
+        MAX = atol(argv[2]);
+        flint_printf("MIN %wd\n", MIN);
+        flint_printf("MAX %wd\n", MAX);
+        EXP = 1;
+
+        NUM_THREADS = atoi(argv[3]);
+    }
+
+    flint_set_num_threads(NUM_THREADS);
+    printf("num_threads %d\n", flint_get_num_threads());
+
+    // error check for max
+    if (argc == 3 && EXP > 18) {
+        printf("[ERROR] MAX cannot exceed 10**18.\n");
+
+        return 1;
+    }
+    if (argc == 4 && MIN > MAX) {
+        printf("[ERROR] MIN cannot be greater than MAX.\n");
+
+        return 1;
+    }
+
+    FILE* fp = fopen("output.txt", "w");
+
+    pthread_t threads[NUM_THREADS];
+    myarg_t myargs[NUM_THREADS];
+
+    struct timespec start, end;
+    double cpu_time = 0.0;
+    int e, t; // the indices
+    slong n, count, max, step;
+    n = MIN - 1; 
+    count = 0; // the total
+
+    flint_fprintf(fp, "MIN %wd, MAX %wd\n", MIN, MAX);
+    fprintf(fp, "N\t\t\t\tcount\t\t\t\ttime (s)\n");
+    // for each exponent
+    for (e = 1; e <= EXP; e++) {
+        max = (argc == 4) ? MAX : quick_pow10(e);
+        step = (max - n) / NUM_THREADS;
+
+        clock_gettime(CLOCK_MONOTONIC, &start);
+
+        // for each thread
+        for (t = 0; t < NUM_THREADS; t++) {
+            myargs[t].count = 0;
+            myargs[t].MIN = n + 1;
+            myargs[t].MAX = (t == NUM_THREADS - 1) ?
+                max : n + step;
+
+            // flint_printf("t %d, MIN %wd, MAX %wd\n", t, myargs[t].MIN, myargs[t].MAX);
+
+            pthread_create(&threads[t], NULL, thread, &myargs[t]);
+
+            n += step;
+        }
+        
+        for (t = 0; t < NUM_THREADS; t++) {	
+            pthread_join(threads[t], NULL); // wait for the specified thread to terminate
+            count += myargs[t].count; // sum
+        }
+
+        clock_gettime(CLOCK_MONOTONIC, &end);
+        cpu_time += end.tv_sec - start.tv_sec;
+        cpu_time += (end.tv_nsec - start.tv_nsec) / 1000000000.0;
+
+        // flint_fprintf(fp, "%wd\t\t\t\t%wd\t\t\t\t%f\n", quick_pow10(e), count, cpu_time);
+        if (argc == 4) {
+            flint_fprintf(fp, "%wd\t\t\t\t%wd\t\t\t\t%f\n", MAX, count, cpu_time);
+        }
+        else {
+            flint_fprintf(fp, "10**%d\t\t\t\t%wd\t\t\t\t%f\n", e, count, cpu_time);
+        }
+        fflush(fp);
+
+        n = max;
+    }
+
+    flint_printf("count %wd\n", count);
 
     fclose(fp);
     return 0;
