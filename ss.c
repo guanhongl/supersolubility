@@ -32,15 +32,15 @@ slong quick_pow10(int n)
 /**
  * returns 2**n
  */
-slong quick_pow2(int n)
-{
-    // max is 2**62
-    // slong pow2 = 1 << n;
-    slong pow2 = 0x4000000000000000; // 0100 ... 0000
-    pow2 = pow2 >> (62 - n);
+// slong quick_pow2(int n)
+// {
+//     // max is 2**62
+//     // slong pow2 = 1 << n;
+//     slong pow2 = 0x4000000000000000; // 0100 ... 0000
+//     pow2 = pow2 >> (62 - n);
 
-    return pow2;
-}
+//     return pow2;
+// }
 
 /**
  * Sets f to the greatest common divisor of g and h. The result is always positive, even if one of g and h is negative
@@ -62,16 +62,16 @@ void get_gcd(fmpz_t f, slong g, slong h)
  * if any product in products is divisble by n, return n
  * else return 1
  */
-slong list_gcd(int *products, slong n, slong size)
-{
-    for (slong i = 0; i < size; i++) {
-        if (products[i] % n == 0) {
-            return n;
-        }
-    }
+// slong list_gcd(int *products, slong n, slong size)
+// {
+//     for (slong i = 0; i < size; i++) {
+//         if (products[i] % n == 0) {
+//             return n;
+//         }
+//     }
 
-    return 1;
-}
+//     return 1;
+// }
 
 /**
  * returns 1 if n is an ss number, else return 0
@@ -91,6 +91,7 @@ int is_ss(slong n)
     // try all combinations of p_i and p_j
     slong i, j, e, k; // the indices
     slong e_i, e_j, p_i, p_j, p_k;
+    slong list_gcd;
     for (i = 0; i < limit; i++) {
         for (j = 0; j < limit; j++) {
             if (j != i) {
@@ -100,7 +101,8 @@ int is_ss(slong n)
                 p_j = fmpz_get_si(factors->p + j); // the jth factor
                 // allocate mem for products
                 // e.g. products for 7**2 = [6, 48]
-                int *products = malloc(e_j * sizeof(slong));
+                // int *products = malloc(e_j * sizeof(slong));
+                list_gcd = 1;
 
                 for (e = 1; e <= e_j; e++) {
                     // product = the jth factor ** e
@@ -108,7 +110,11 @@ int is_ss(slong n)
                     fmpz_init(product);
                     fmpz_pow_ui(product, (factors->p + j), e);
                     // append the product - 1
-                    products[e - 1] = fmpz_get_si(product) - 1;
+                    // products[e - 1] = fmpz_get_si(product) - 1;
+                    if ((fmpz_get_si(product) - 1) % p_i == 0) {
+                        list_gcd = p_i;
+                        e = e_j + 1; // break
+                    }
 
                     fmpz_clear(product);
                 }
@@ -117,7 +123,8 @@ int is_ss(slong n)
                 fmpz_init(gcd);
                 get_gcd(gcd, p_i, p_j - 1);
                 // CONDITION ONE
-                if (list_gcd(products, p_i, e_j) == fmpz_get_si(gcd)) {
+                // if (list_gcd(products, p_i, e_j) == fmpz_get_si(gcd)) {
+                if (list_gcd == fmpz_get_si(gcd)) {
                     // CONDITION TWO
                     if (p_i <= e_j) {
                         // CONDITION THREE
@@ -164,7 +171,7 @@ int is_ss(slong n)
                 }
 
                 fmpz_clear(gcd);
-                free(products);
+                // free(products);
 
                 // break loops if fail
                 if (pass == 0) {
@@ -307,6 +314,7 @@ int main(int argc, char* argv[])
     }
 
     flint_printf("count %wd\n", count);
+    printf("cpu_time %f\n", cpu_time);
 
     fclose(fp);
     return 0;
