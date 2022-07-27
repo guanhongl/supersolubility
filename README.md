@@ -54,7 +54,7 @@ make
 ./ss k num_threads
 ```
 
-## Gotchas
+## gotchas
 
 If it happens that GMP and MPFR are not in a standard location on your system (e.g. not in /usr/include/ and /usr/lib/), you need to tell the configure script where they are with the options --with-gmp=/path/to/gmp or --with-mpir=/path/to/mpir and --with-mpfr=/path/to/mpfr, e.g.
 ```
@@ -65,3 +65,7 @@ If it happens that FLINT is not in a standard location on your system, you need 
 LFLAGS=-lflint -lmpfr -lgmp -lpthread -L/path/to/flint/lib
 CFLAGS=-Wall -O3 -I/path/to/flint/include
 ```
+
+## future work
+
+Rewrite the program using shared-memory parallel programming models like OpenMPI to utilize multiple nodes.
