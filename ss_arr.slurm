@@ -17,13 +17,10 @@
 
 ## Useful for remote notification
 ##SBATCH --mail-type=BEGIN,END,FAIL,REQUEUE,TIME_LIMIT_80
-#SBATCH --mail-type=BEGIN,END,FAIL,REQUEUE
-#SBATCH --mail-user=guanhong@hawaii.edu
+##SBATCH --mail-user=test@foo.com
 
 ## All options and environment variables found on schedMD site: http://slurm.schedmd.com/sbatch.html
 
-##module purge 
-##./build.sh
 min=$(( SLURM_ARRAY_TASK_ID * 100000000000 + 1 ))
 max=$(( ( SLURM_ARRAY_TASK_ID + 1 ) * 100000000000 ))
 export LD_LIBRARY_PATH="/home/guanhong/flint/lib/"
