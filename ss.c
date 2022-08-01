@@ -30,23 +30,10 @@ slong quick_pow10(int n)
 }
 
 /**
- * returns 2**n
- */
-// slong quick_pow2(int n)
-// {
-//     // max is 2**62
-//     // slong pow2 = 1 << n;
-//     slong pow2 = 0x4000000000000000; // 0100 ... 0000
-//     pow2 = pow2 >> (62 - n);
-
-//     return pow2;
-// }
-
-/**
  * Sets f to the greatest common divisor of g and h. The result is always positive, even if one of g and h is negative
  * http://flintlib.org/doc/fmpz.html#c.fmpz_gcd
  */
-void get_gcd(fmpz_t f, slong g, slong h)
+void gcd(fmpz_t f, slong g, slong h)
 {
     fmpz_t a, b;
     fmpz_init_set_si(a, g);
@@ -57,21 +44,6 @@ void get_gcd(fmpz_t f, slong g, slong h)
     fmpz_clear(a);
     fmpz_clear(b);
 }
-
-/**
- * if any product in products is divisble by n, return n
- * else return 1
- */
-// slong list_gcd(int *products, slong n, slong size)
-// {
-//     for (slong i = 0; i < size; i++) {
-//         if (products[i] % n == 0) {
-//             return n;
-//         }
-//     }
-
-//     return 1;
-// }
 
 /**
  * returns 1 if n is an ss number, else return 0
@@ -90,52 +62,47 @@ int is_ss(slong n)
 
     // try all combinations of p_i and p_j
     slong i, j, e, k; // the indices
-    slong e_i, e_j, p_i, p_j, p_k;
-    slong list_gcd;
+    slong p_i, p_j, e_i, e_j, p_k;
+    slong gcd_1;
     for (i = 0; i < limit; i++) {
         for (j = 0; j < limit; j++) {
             if (j != i) {
-                e_i = fmpz_get_si(factors->exp + i); // the ith exponent
-                e_j = fmpz_get_si(factors->exp + j); // the jth exponent
                 p_i = fmpz_get_si(factors->p + i); // the ith factor
                 p_j = fmpz_get_si(factors->p + j); // the jth factor
-                // allocate mem for products
-                // e.g. products for 7**2 = [6, 48]
-                // int *products = malloc(e_j * sizeof(slong));
-                list_gcd = 1;
-
+                e_i = fmpz_get_si(factors->exp + i); // the ith exponent
+                e_j = fmpz_get_si(factors->exp + j); // the jth exponent
+                gcd_1 = 1;
+                // get gcd(p_i, Pi)
                 for (e = 1; e <= e_j; e++) {
-                    // product = the jth factor ** e
+                    // product = the jth factor ** e - 1
                     fmpz_t product;
                     fmpz_init(product);
                     fmpz_pow_ui(product, (factors->p + j), e);
-                    // append the product - 1
-                    // products[e - 1] = fmpz_get_si(product) - 1;
                     if ((fmpz_get_si(product) - 1) % p_i == 0) {
-                        list_gcd = p_i;
+                        gcd_1 = p_i;
                         e = e_j + 1; // break
                     }
 
                     fmpz_clear(product);
                 }
-
-                fmpz_t gcd;
-                fmpz_init(gcd);
-                get_gcd(gcd, p_i, p_j - 1);
-                // CONDITION ONE
-                // if (list_gcd(products, p_i, e_j) == fmpz_get_si(gcd)) {
-                if (list_gcd == fmpz_get_si(gcd)) {
-                    // CONDITION TWO
+                // get gcd(p_i, p_j - 1)
+                fmpz_t gcd_2;
+                fmpz_init(gcd_2);
+                gcd(gcd_2, p_i, p_j - 1);
+                // condition 1: gcd_1 == gcd_2
+                if (gcd_1 == fmpz_get_si(gcd_2)) {
+                    // condition 2: when p_i <= e_j
                     if (p_i <= e_j) {
-                        // CONDITION THREE
+                        // condition 2a: we must have 1 <= e_i <= 2
                         if (e_i == 1 || e_i == 2) {
                             // product = the ith factor ** the ith exp
                             fmpz_t product;
                             fmpz_init(product);
                             fmpz_pow_ui(product, (factors->p + i), e_i);
-                            // CONDITION FOUR
+                            // condition 2b: p_i**e_i divides p_j - 1
                             if ((p_j - 1) % fmpz_get_si(product) == 0) {
-                                // CONDITION FIVE
+                                // condition 2c: no p_k exists (i < k < j)
+                                // s.t. p_i divides p_k - 1 and p_k divides p_j - 1 
                                 for (k = i + 1; k < j; k++) {
                                     p_k = fmpz_get_si(factors->p + k); // the (i + 1)th factor
 
@@ -150,28 +117,26 @@ int is_ss(slong n)
                                     }
                                 }
                             }
-                            // CONDITION FOUR
+                            // end condition 2b
                             else {
                                 pass = 0;
                             }
 
                             fmpz_clear(product);
                         } 
-                        // CONDITION THREE
+                        // end condition 2a
                         else {
                             pass = 0;
                         }
                     }
-                    // CONDITION TWO
-                    // continue if CON ONE is true and CON TWO is false
+                    // end condition 2
                 } 
-                // CONDITION ONE
+                // end condition 1
                 else {
                     pass = 0;
                 }
 
-                fmpz_clear(gcd);
-                // free(products);
+                fmpz_clear(gcd_2);
 
                 // break loops if fail
                 if (pass == 0) {
@@ -224,22 +189,22 @@ int main(int argc, char* argv[])
     }
     // get the EXP from the cmd line args
     if (argc == 3) {
-        EXP = atoi(argv[1]);
+        EXP = strtol(argv[1], NULL, 10); // ignore leftover
         MAX = quick_pow10(EXP);
         printf("EXP %d\n", EXP);
         flint_printf("MAX %wd\n", MAX);
 
-        NUM_THREADS = atoi(argv[2]);
+        NUM_THREADS = strtol(argv[2], NULL, 10);
     }
     // get the MIN, MAX
     if (argc == 4) {
-        MIN = atol(argv[1]);
-        MAX = atol(argv[2]);
+        MIN = strtol(argv[1], NULL, 10);
+        MAX = strtol(argv[2], NULL, 10);
         flint_printf("MIN %wd\n", MIN);
         flint_printf("MAX %wd\n", MAX);
         EXP = 1;
 
-        NUM_THREADS = atoi(argv[3]);
+        NUM_THREADS = strtol(argv[3], NULL, 10);
     }
 
     flint_set_num_threads(NUM_THREADS);
@@ -256,6 +221,7 @@ int main(int argc, char* argv[])
 
         return 1;
     }
+    fflush(stdout);
 
     FILE* fp = fopen("output.txt", "w");
 
@@ -285,8 +251,6 @@ int main(int argc, char* argv[])
             myargs[t].MAX = (t == NUM_THREADS - 1) ?
                 max : n + step;
 
-            // flint_printf("t %d, MIN %wd, MAX %wd\n", t, myargs[t].MIN, myargs[t].MAX);
-
             pthread_create(&threads[t], NULL, thread, &myargs[t]);
 
             n += step;
@@ -301,14 +265,13 @@ int main(int argc, char* argv[])
         cpu_time += end.tv_sec - start.tv_sec;
         cpu_time += (end.tv_nsec - start.tv_nsec) / 1000000000.0;
 
-        // flint_fprintf(fp, "%wd\t\t\t\t%wd\t\t\t\t%f\n", quick_pow10(e), count, cpu_time);
+        fflush(fp);
         if (argc == 4) {
             flint_fprintf(fp, "%wd\t\t\t\t%wd\t\t\t\t%f\n", MAX, count, cpu_time);
         }
         else {
             flint_fprintf(fp, "10**%d\t\t\t\t%wd\t\t\t\t%f\n", e, count, cpu_time);
         }
-        fflush(fp);
 
         n = max;
     }
