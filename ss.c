@@ -91,8 +91,8 @@ int is_ss(slong n)
                 gcd(gcd_2, p_i, p_j - 1);
                 // condition 1: gcd_1 == gcd_2
                 if (gcd_1 == fmpz_get_si(gcd_2)) {
-                    // condition 2: when p_i <= e_j
-                    if (p_i <= e_j) {
+                    // condition 2: when p_i <= e_j (i < j)
+                    if (p_i <= e_j && i < j) {
                         // condition 2a: we must have 1 <= e_i <= 2
                         if (e_i == 1 || e_i == 2) {
                             // product = the ith factor ** the ith exp
