@@ -62,58 +62,103 @@ int is_ss(slong n)
 
     slong i, k, j; // the indices
     slong p_i, a_i, p_k, a_k, p_j;
-    slong psi;
+    slong p, v, v_max;
+    fmpz_t qv_t, qi_t; // q^v, q_i
+    slong qv, qi;
+    // slong psi;
     // condition 1: for all i, 
     // the distinct prime factors of gcd(n, psi) and gcd(n, p_i - 1) are equal
-    for (i = 0; i < limit; i++) {
-        p_i = fmpz_get_si(factors->p + i);
-        a_i = fmpz_get_si(factors->exp + i);
-        // psi(p**k) = (p**k - 1)(p**(k-1) - 1)...(p - 1)
-        psi = 1;
-        for (k = a_i; k > 0; k--) {
-            fmpz_t product;
-            fmpz_init(product);
-            fmpz_pow_ui(product, (factors->p + i), k);
+    // for (i = 0; i < limit; i++) {
+    //     p_i = fmpz_get_si(factors->p + i);
+    //     a_i = fmpz_get_si(factors->exp + i);
+    //     // psi(p**k) = (p**k - 1)(p**(k-1) - 1)...(p - 1)
+    //     psi = 1;
+    //     for (k = a_i; k > 0; k--) {
+    //         fmpz_t product;
+    //         fmpz_init(product);
+    //         fmpz_pow_ui(product, (factors->p + i), k);
 
-            psi *= fmpz_get_si(product) - 1;
+    //         psi *= fmpz_get_si(product) - 1;
 
-            fmpz_clear(product);
-        }
-        // get gcd(n, psi)
-        fmpz_t gcd_1;
-        fmpz_init(gcd_1);
-        gcd(gcd_1, n, psi);
-        // get gcd(n, p_i - 1)
-        fmpz_t gcd_2;
-        fmpz_init(gcd_2);
-        gcd(gcd_2, n, p_i - 1);
-        // get the distinct prime factors of gcd_1, gcd_2
-        fmpz_factor_t fac_1, fac_2;
-        fmpz_factor_init(fac_1);
-        fmpz_factor_init(fac_2);
-        fmpz_factor(fac_1, gcd_1);
-        fmpz_factor(fac_2, gcd_2);
-        // condition 1
-        if (fac_1->num == fac_2->num) {
-            // for any i, if the factors do not equal, then fail
-            for (j = 0; j < fac_1-> num; j++) {
-                if (fmpz_get_si(fac_1->p + j) != fmpz_get_si(fac_2->p + j)) {
-                    pass = 0;
-                    i = limit; // break
-                    j = fac_1->num;
+    //         fmpz_clear(product);
+    //     }
+    //     // get gcd(n, psi)
+    //     fmpz_t gcd_1;
+    //     fmpz_init(gcd_1);
+    //     gcd(gcd_1, n, psi);
+    //     // get gcd(n, p_i - 1)
+    //     fmpz_t gcd_2;
+    //     fmpz_init(gcd_2);
+    //     gcd(gcd_2, n, p_i - 1);
+    //     // get the distinct prime factors of gcd_1, gcd_2
+    //     fmpz_factor_t fac_1, fac_2;
+    //     fmpz_factor_init(fac_1);
+    //     fmpz_factor_init(fac_2);
+    //     fmpz_factor(fac_1, gcd_1);
+    //     fmpz_factor(fac_2, gcd_2);
+    //     // condition 1
+    //     if (fac_1->num == fac_2->num) {
+    //         // for any i, if the factors do not equal, then fail
+    //         for (j = 0; j < fac_1-> num; j++) {
+    //             if (fmpz_get_si(fac_1->p + j) != fmpz_get_si(fac_2->p + j)) {
+    //                 pass = 0;
+    //                 i = limit; // break
+    //                 j = fac_1->num;
+    //             }
+    //         }
+    //     }
+    //     else {
+    //         pass = 0;
+    //         i = limit; // break
+    //     }
+
+    //     fmpz_clear(gcd_1);
+    //     fmpz_clear(gcd_2);
+    //     fmpz_factor_clear(fac_1);
+    //     fmpz_factor_clear(fac_2);
+    // }
+
+    // alternate (1): n is not an SS# if it has a factor of the form p * q^v (v >= 2)
+    // and p divides q^v - 1 and p does not divide q^i - 1 (i < v)
+    for (j = 0; j < limit; j++) {
+        // q = fmpz_get_si(factors->p + j);
+        v_max = fmpz_get_si(factors->exp + j);
+
+        if (v_max >= 2) {
+            for (v = 2; v <= v_max; v++) {
+                for (k = 0; k < limit; k++) {
+                    if (k != j) {
+                        p = fmpz_get_si(factors->p + k);
+
+                        fmpz_init(qv_t);
+                        fmpz_pow_ui(qv_t, (factors->p + j), v);
+                        qv = fmpz_get_si(qv_t);
+
+                        if ((qv - 1) % p == 0) {
+                            for (i = 1; i < v; i++) {
+                                fmpz_init(qi_t);
+                                fmpz_pow_ui(qi_t, (factors->p + j), i);
+                                qi = fmpz_get_si(qi_t);
+
+                                if ((qi - 1) % p != 0) {
+                                    pass = 0;
+                                    i = v; //  break
+                                    k = limit;
+                                    v = v_max + 1;
+                                    j = limit;
+                                }
+
+                                fmpz_clear(qi_t);
+                            }
+                        }
+
+                        fmpz_clear(qv_t);
+                    }
                 }
             }
         }
-        else {
-            pass = 0;
-            i = limit; // break
-        }
-
-        fmpz_clear(gcd_1);
-        fmpz_clear(gcd_2);
-        fmpz_factor_clear(fac_1);
-        fmpz_factor_clear(fac_2);
     }
+
     // condition 2: if there exists p_i <= a_k (i != k)
     if (pass == 1) {
         // try all p_i <= a_k
