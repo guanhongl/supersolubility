@@ -50,7 +50,6 @@ void gcd(fmpz_t f, slong g, slong h)
  */
 int is_ss(slong n)
 {
-    int pass = 1;
     // fmpz_factor_t consists of two fmpz vectors representing bases and exponents
     fmpz_factor_t factors;
     // Initialises an fmpz_factor_t structure
@@ -65,146 +64,93 @@ int is_ss(slong n)
     slong p, v, v_max;
     fmpz_t qv_t, qi_t; // q^v, q_i
     slong qv, qi;
-    // slong psi;
-    // condition 1: for all i, 
-    // the distinct prime factors of gcd(n, psi) and gcd(n, p_i - 1) are equal
-    // for (i = 0; i < limit; i++) {
-    //     p_i = fmpz_get_si(factors->p + i);
-    //     a_i = fmpz_get_si(factors->exp + i);
-    //     // psi(p**k) = (p**k - 1)(p**(k-1) - 1)...(p - 1)
-    //     psi = 1;
-    //     for (k = a_i; k > 0; k--) {
-    //         fmpz_t product;
-    //         fmpz_init(product);
-    //         fmpz_pow_ui(product, (factors->p + i), k);
-
-    //         psi *= fmpz_get_si(product) - 1;
-
-    //         fmpz_clear(product);
-    //     }
-    //     // get gcd(n, psi)
-    //     fmpz_t gcd_1;
-    //     fmpz_init(gcd_1);
-    //     gcd(gcd_1, n, psi);
-    //     // get gcd(n, p_i - 1)
-    //     fmpz_t gcd_2;
-    //     fmpz_init(gcd_2);
-    //     gcd(gcd_2, n, p_i - 1);
-    //     // get the distinct prime factors of gcd_1, gcd_2
-    //     fmpz_factor_t fac_1, fac_2;
-    //     fmpz_factor_init(fac_1);
-    //     fmpz_factor_init(fac_2);
-    //     fmpz_factor(fac_1, gcd_1);
-    //     fmpz_factor(fac_2, gcd_2);
-    //     // condition 1
-    //     if (fac_1->num == fac_2->num) {
-    //         // for any i, if the factors do not equal, then fail
-    //         for (j = 0; j < fac_1-> num; j++) {
-    //             if (fmpz_get_si(fac_1->p + j) != fmpz_get_si(fac_2->p + j)) {
-    //                 pass = 0;
-    //                 i = limit; // break
-    //                 j = fac_1->num;
-    //             }
-    //         }
-    //     }
-    //     else {
-    //         pass = 0;
-    //         i = limit; // break
-    //     }
-
-    //     fmpz_clear(gcd_1);
-    //     fmpz_clear(gcd_2);
-    //     fmpz_factor_clear(fac_1);
-    //     fmpz_factor_clear(fac_2);
-    // }
 
     // alternate (1): n is not an SS# if it has a factor of the form p * q^v (v >= 2)
     // and p divides q^v - 1 and p does not divide q^i - 1 (i < v)
     for (j = 0; j < limit; j++) {
-        // q = fmpz_get_si(factors->p + j);
         v_max = fmpz_get_si(factors->exp + j);
 
-        if (v_max >= 2) {
-            for (v = 2; v <= v_max; v++) {
-                for (k = 0; k < limit; k++) {
-                    if (k != j) {
-                        p = fmpz_get_si(factors->p + k);
+        if (v_max < 2) {
+            continue;
+        }
 
-                        fmpz_init(qv_t);
-                        fmpz_pow_ui(qv_t, (factors->p + j), v);
-                        qv = fmpz_get_si(qv_t);
-
-                        if ((qv - 1) % p == 0) {
-                            for (i = 1; i < v; i++) {
-                                fmpz_init(qi_t);
-                                fmpz_pow_ui(qi_t, (factors->p + j), i);
-                                qi = fmpz_get_si(qi_t);
-
-                                if ((qi - 1) % p != 0) {
-                                    pass = 0;
-                                    i = v; //  break
-                                    k = limit;
-                                    v = v_max + 1;
-                                    j = limit;
-                                }
-
-                                fmpz_clear(qi_t);
-                            }
-                        }
-
-                        fmpz_clear(qv_t);
-                    }
+        for (v = 2; v <= v_max; v++) {
+            for (k = 0; k < limit; k++) {
+                if (k == j) {
+                    continue;
                 }
+
+                p = fmpz_get_si(factors->p + k);
+
+                fmpz_init(qv_t);
+                fmpz_pow_ui(qv_t, (factors->p + j), v);
+                qv = fmpz_get_si(qv_t);
+
+                if ((qv - 1) % p != 0) {
+                    fmpz_clear(qv_t);
+                    continue;
+                }
+
+                for (i = 1; i < v; i++) {
+                    fmpz_init(qi_t);
+                    fmpz_pow_ui(qi_t, (factors->p + j), i);
+                    qi = fmpz_get_si(qi_t);
+
+                    if ((qi - 1) % p != 0) {
+                        fmpz_clear(qi_t);
+                        fmpz_clear(qv_t);
+                        fmpz_factor_clear(factors);
+
+                        return 0;
+                    }
+
+                    fmpz_clear(qi_t);
+                }
+
+                fmpz_clear(qv_t);
             }
         }
     }
 
     // condition 2: if there exists p_i <= a_k (i != k)
-    if (pass == 1) {
-        // try all p_i <= a_k
-        for (i = 0; i < limit; i++) {
-            p_i = fmpz_get_si(factors->p + i);
-            a_i = fmpz_get_si(factors->exp + i);
-            for (k = 0; k < limit; k++) {
-                p_k = fmpz_get_si(factors->p + k);
-                a_k = fmpz_get_si(factors->exp + k);
-                // condition 2
-                if (i != k && p_i <= a_k) {
-                    // condition 2a: there does not exist a prime p_j
-                    // s.t. p_i divides p_j - 1 and p_j divides p_k - 1
-                    for (j = 0; j < limit; j++) {
-                        p_j = fmpz_get_si(factors->p + j);
-                        if 
-                        (
-                            ((p_j - 1) % p_i == 0) &&
-                            ((p_k - 1) % p_j == 0)
-                        )
-                        {
-                            pass = 0;
-                            j = limit; // break
-                        }
+    // try all p_i <= a_k
+    for (i = 0; i < limit; i++) {
+        p_i = fmpz_get_si(factors->p + i);
+        a_i = fmpz_get_si(factors->exp + i);
+        for (k = 0; k < limit; k++) {
+            p_k = fmpz_get_si(factors->p + k);
+            a_k = fmpz_get_si(factors->exp + k);
+
+            // condition 2
+            if (i != k && p_i <= a_k) {
+                // condition 2a: there does not exist a prime p_j
+                // s.t. p_i divides p_j - 1 and p_j divides p_k - 1
+                for (j = 0; j < limit; j++) {
+                    p_j = fmpz_get_si(factors->p + j);
+
+                    if 
+                    (
+                        ((p_j - 1) % p_i == 0) &&
+                        ((p_k - 1) % p_j == 0)
+                    )
+                    {
+                        fmpz_factor_clear(factors);
+
+                        return 0;
                     }
-                    // condition 2b: a_i <= 2
-                    // if a_i == 2, then p_i**2 divides p_k - 1
-                    if (pass == 1) {
-                        if
-                        (
-                            (a_i == 1) ||
-                            ( a_i == 2 && ((p_k - 1) % (p_i * p_i) == 0) )
-                        )
-                        {
-                            // do nothing
-                        }
-                        else {
-                            pass = 0;
-                        }
-                    }
-                    
-                    // break loop
-                    if (pass == 0) {
-                        k = limit;
-                        i = limit;
-                    }
+                }
+
+                // condition 2b: a_i <= 2
+                // if a_i == 2, then p_i**2 divides p_k - 1
+                if
+                (
+                    (a_i > 2) ||
+                    ( a_i == 2 && ((p_k - 1) % (p_i * p_i) != 0) )
+                )
+                {
+                    fmpz_factor_clear(factors);
+
+                    return 0;
                 }
             }
         }
@@ -213,7 +159,7 @@ int is_ss(slong n)
     // Clears an fmpz_factor_t structure
     fmpz_factor_clear(factors);
 
-    return pass;
+    return 1;
 }
 
 /**
@@ -226,8 +172,11 @@ void * thread(void * arg) {
         if (is_ss(n) == 1) {
             myarg->count++;
         }
-    }
 
+        // flint_cleanup();
+    }
+        
+    flint_cleanup();
     return NULL; // return NULL; terminate the thread
 }
 
