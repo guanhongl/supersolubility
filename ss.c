@@ -50,7 +50,6 @@ void gcd(fmpz_t f, slong g, slong h)
  */
 int is_ss(slong n)
 {
-    int pass = 1;
     // fmpz_factor_t consists of two fmpz vectors representing bases and exponents
     fmpz_factor_t factors;
     // Initialises an fmpz_factor_t structure
@@ -64,93 +63,102 @@ int is_ss(slong n)
     slong i, j, e, k; // the indices
     slong p_i, p_j, e_i, e_j, p_k;
     slong gcd_1;
+
     for (i = 0; i < limit; i++) {
         for (j = 0; j < limit; j++) {
-            if (j != i) {
-                p_i = fmpz_get_si(factors->p + i); // the ith factor
-                p_j = fmpz_get_si(factors->p + j); // the jth factor
-                e_i = fmpz_get_si(factors->exp + i); // the ith exponent
-                e_j = fmpz_get_si(factors->exp + j); // the jth exponent
-                gcd_1 = 1;
-                // get gcd(p_i, Pi)
-                for (e = 1; e <= e_j; e++) {
-                    // product = the jth factor ** e - 1
-                    fmpz_t product;
-                    fmpz_init(product);
-                    fmpz_pow_ui(product, (factors->p + j), e);
-                    if ((fmpz_get_si(product) - 1) % p_i == 0) {
-                        gcd_1 = p_i;
-                        e = e_j + 1; // break
-                    }
-
-                    fmpz_clear(product);
-                }
-                // get gcd(p_i, p_j - 1)
-                fmpz_t gcd_2;
-                fmpz_init(gcd_2);
-                gcd(gcd_2, p_i, p_j - 1);
-                // condition 1: gcd_1 == gcd_2
-                if (gcd_1 == fmpz_get_si(gcd_2)) {
-                    // condition 2: when p_i <= e_j (i < j)
-                    if (p_i <= e_j && i < j) {
-                        // condition 2a: we must have 1 <= e_i <= 2
-                        if (e_i == 1 || e_i == 2) {
-                            // product = the ith factor ** the ith exp
-                            fmpz_t product;
-                            fmpz_init(product);
-                            fmpz_pow_ui(product, (factors->p + i), e_i);
-                            // condition 2b: p_i**e_i divides p_j - 1
-                            if ((p_j - 1) % fmpz_get_si(product) == 0) {
-                                // condition 2c: no p_k exists (i < k < j)
-                                // s.t. p_i divides p_k - 1 and p_k divides p_j - 1 
-                                for (k = i + 1; k < j; k++) {
-                                    p_k = fmpz_get_si(factors->p + k); // the (i + 1)th factor
-
-                                    if 
-                                    (
-                                        ((p_k - 1) % p_i == 0) &&
-                                        ((p_j - 1) % p_k == 0)
-                                    )
-                                    {
-                                        pass = 0;
-                                        k = j; // break
-                                    }
-                                }
-                            }
-                            // end condition 2b
-                            else {
-                                pass = 0;
-                            }
-
-                            fmpz_clear(product);
-                        } 
-                        // end condition 2a
-                        else {
-                            pass = 0;
-                        }
-                    }
-                    // end condition 2
-                } 
-                // end condition 1
-                else {
-                    pass = 0;
-                }
-
-                fmpz_clear(gcd_2);
-
-                // break loops if fail
-                if (pass == 0) {
-                    i = limit;
-                    j = limit;
-                }
+            if (j == i) {
+                continue;
             }
+
+            p_i = fmpz_get_si(factors->p + i); // the ith factor
+            p_j = fmpz_get_si(factors->p + j); // the jth factor
+            e_i = fmpz_get_si(factors->exp + i); // the ith exponent
+            e_j = fmpz_get_si(factors->exp + j); // the jth exponent
+            gcd_1 = 1;
+
+            // get gcd(p_i, Pi)
+            for (e = 1; e <= e_j; e++) {
+                // product = the jth factor ** e - 1
+                fmpz_t product;
+                fmpz_init(product);
+                fmpz_pow_ui(product, (factors->p + j), e);
+
+                if ((fmpz_get_si(product) - 1) % p_i == 0) {
+                    gcd_1 = p_i;
+                    fmpz_clear(product);
+                    break;
+                }
+
+                fmpz_clear(product);
+            }
+
+            // get gcd(p_i, p_j - 1)
+            fmpz_t gcd_2;
+            fmpz_init(gcd_2);
+            gcd(gcd_2, p_i, p_j - 1);
+
+            // condition 1: gcd_1 == gcd_2
+            if (gcd_1 != fmpz_get_si(gcd_2)) {
+                fmpz_clear(gcd_2);
+                fmpz_factor_clear(factors);
+                
+                return 0;
+            }
+            
+            // condition 2: when p_i <= e_j
+            if (p_i <= e_j && i < j) {
+                // condition 2a: we must have 1 <= e_i <= 2
+                if (e_i > 2) {
+                    fmpz_clear(gcd_2);
+                    fmpz_factor_clear(factors);
+                    
+                    return 0;
+                }
+
+                // product = the ith factor ** the ith exp
+                fmpz_t product;
+                fmpz_init(product);
+                fmpz_pow_ui(product, (factors->p + i), e_i);
+
+                // condition 2b: p_i**e_i divides p_j - 1
+                if ((p_j - 1) % fmpz_get_si(product) != 0) {
+                    fmpz_clear(gcd_2);
+                    fmpz_clear(product);
+                    fmpz_factor_clear(factors);
+                    
+                    return 0;
+                }
+
+                // condition 2c: no p_k exists (i < k < j)
+                // s.t. p_i divides p_k - 1 and p_k divides p_j - 1 
+                for (k = i + 1; k < j; k++) {
+                    p_k = fmpz_get_si(factors->p + k); // the (i + 1)th factor
+
+                    if 
+                    (
+                        ((p_k - 1) % p_i == 0) &&
+                        ((p_j - 1) % p_k == 0)
+                    )
+                    {
+                        fmpz_clear(gcd_2);
+                        fmpz_clear(product);
+                        fmpz_factor_clear(factors);
+
+                        return 0;
+                    }
+                }
+
+                fmpz_clear(product);
+            }
+
+            fmpz_clear(gcd_2);
         }
     }
 
     // Clears an fmpz_factor_t structure
     fmpz_factor_clear(factors);
 
-    return pass;
+    return 1;
 }
 
 /**
@@ -163,8 +171,11 @@ void * thread(void * arg) {
         if (is_ss(n) == 1) {
             myarg->count++;
         }
-    }
 
+        // flint_cleanup();
+    }
+        
+    flint_cleanup();
     return NULL; // return NULL; terminate the thread
 }
 
